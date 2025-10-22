@@ -3,7 +3,7 @@ const settings = {
   author: '‎',
   botName: "Mavrix Bot",
   botOwner: 'Mavrix',
-  ownerNumber: '2349053516893',
+  ownerNumber: '77782137989',
   giphyApiKey: 'qnl7ssQChTdPjsKta2Ax2LMaGXz303tq',
   commandMode: "public",
   maxStoreMessages: 20, 
