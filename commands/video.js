@@ -200,24 +200,20 @@ const CONFIG = {
   timeout: 180000, // 3 minutes for large movie files
   maxRetries: 3,
   retryDelay: 1000,
-  maxVideoSize: 400 * 1024 * 1024, // 400MB - Based on your screenshots!
-  maxVideoDuration: 7200, // 2 hours for full movies
+  maxVideoSize: 400 * 1024 * 1024, // 400MB
+  maxVideoDuration: 7200, // 2 hours
   supportedFormats: ['mp4', 'mkv', 'avi', 'mov', 'wmv'],
   movieKeywords: [
-    // Movie terms
     'movie', 'film', 'cinema', 'pelicula', 'filme', 'cine',
-    // Drama terms from screenshots
     'drama', 'series', 'episode', 'season', 's01', 's02',
-    // File format indicators
     'mkv', 'mp4', 'avi', 'download',
-    // Regions
     'bollywood', 'nollywood', 'korean', 'asian drama',
-    // Specific terms from screenshots
     'genie', 'make a wish', 'khemjira', 'kimoi', 'nkiri', 'naijaprey'
   ]
 };
 
 // 🛡️ Enhanced HTTP Client for Large Files
+// Note: Do NOT set global responseType here - different endpoints expect json vs streaming.
 const httpClient = axios.create({
   timeout: CONFIG.timeout,
   headers: {
@@ -225,16 +221,15 @@ const httpClient = axios.create({
     'Accept': '*/*',
     'Accept-Range': 'bytes'
   },
-  maxContentLength: 500 * 1024 * 1024, // 500MB
-  maxBodyLength: 500 * 1024 * 1024, // 500MB
-  responseType: 'stream' // For large file handling
+  maxContentLength: 500 * 1024 * 1024,
+  maxBodyLength: 500 * 1024 * 1024
 });
 
 // 📁 File Format Handler
 function getMimeType(format) {
   const mimeTypes = {
     'mp4': 'video/mp4',
-    'mkv': 'video/x-matroska', // MKV mime type
+    'mkv': 'video/x-matroska',
     'avi': 'video/x-msvideo',
     'mov': 'video/quicktime',
     'wmv': 'video/x-ms-wmv'
@@ -250,17 +245,14 @@ function getFileExtension(format) {
 function classifyQuery(query) {
   const lowerQuery = query.toLowerCase();
   
-  // Detect drama/series patterns from screenshots
   const isDramaSeries = /(s\d+e\d+|season\s*\d+\s*episode\s*\d+|ep\s*\d+)/i.test(query) ||
                        lowerQuery.includes('drama') ||
                        lowerQuery.includes('series') ||
                        lowerQuery.includes('episode');
   
-  // Detect file format requests
   const requestedFormat = lowerQuery.includes('mkv') ? 'mkv' : 
                          lowerQuery.includes('mp4') ? 'mp4' : null;
 
-  // Check if it's likely a movie/drama request
   const isMovieRequest = CONFIG.movieKeywords.some(keyword => 
     lowerQuery.includes(keyword)
   ) || isDramaSeries;
@@ -405,21 +397,48 @@ function createSuccessCaption(videoData, originalTitle) {
 ✨ *Enjoy your video!*`;
 }
 
-// 🚀 Enhanced Multi-API Fallback for Movies with Format Preference
+// 🔄 Smart Retry System with Jitter that supports json/stream responses
+async function smartFetch(url, retries = CONFIG.maxRetries, opts = { responseType: 'json' }) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`🌐 Fetch attempt ${attempt}/${retries} -> ${url} (responseType=${opts.responseType})`);
+      const response = await httpClient.get(url, { responseType: opts.responseType === 'stream' ? 'stream' : 'json' });
+      // For json responseType, return parsed data; for stream, return the whole response
+      if ((opts.responseType === 'json' && response.status === 200 && response.data) ||
+          (opts.responseType === 'stream' && response.status === 200)) {
+        return opts.responseType === 'json' ? response.data : response;
+      }
+      throw new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      console.warn(`⚠️ Attempt ${attempt} failed for ${url}:`, error.message);
+      if (attempt < retries) {
+        const delay = CONFIG.retryDelay * attempt + Math.random() * 500;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw new Error(`Failed after ${retries} attempts: ${url}`);
+}
+
+// 🚀 Multi-API Fallback for Movies with Format Preference
 async function fetchFromMovieAPIs(searchQuery, preferredFormat = null) {
   const errors = [];
   
   // Try format-specific APIs first if format is preferred
   if (preferredFormat) {
     const formatAPIs = MOVIE_APIS.filter(api => {
-      const sampleResult = api.map({});
-      return sampleResult?.format === preferredFormat;
+      try {
+        const sample = api.map({});
+        return sample?.format === preferredFormat;
+      } catch (e) {
+        return false;
+      }
     });
     
     for (const api of formatAPIs) {
       try {
         console.log(`🔄 Trying ${api.name} for ${preferredFormat.toUpperCase()}...`);
-        const data = await smartFetch(api.url(searchQuery));
+        const data = await smartFetch(api.url(searchQuery), CONFIG.maxRetries, { responseType: 'json' });
         const result = api.map(data);
         
         if (result && result.download) {
@@ -440,7 +459,7 @@ async function fetchFromMovieAPIs(searchQuery, preferredFormat = null) {
   for (const api of MOVIE_APIS) {
     try {
       console.log(`🔄 Trying ${api.name}...`);
-      const data = await smartFetch(api.url(searchQuery));
+      const data = await smartFetch(api.url(searchQuery), CONFIG.maxRetries, { responseType: 'json' });
       const result = api.map(data);
       
       if (result && result.download) {
@@ -463,6 +482,7 @@ async function fetchFromMovieAPIs(searchQuery, preferredFormat = null) {
 // 📏 Enhanced Video Size Validator for Large Files
 async function validateVideoSize(videoUrl) {
   try {
+    // Use HEAD to fetch Content-Length and Content-Type
     const response = await httpClient.head(videoUrl, { timeout: 10000 });
     const contentLength = response.headers['content-length'];
     const contentType = response.headers['content-type'] || '';
@@ -475,7 +495,6 @@ async function validateVideoSize(videoUrl) {
       };
     }
     
-    // Check if format is supported
     const isVideo = contentType.includes('video/') || 
                    videoUrl.includes('.mkv') || 
                    videoUrl.includes('.mp4') ||
@@ -491,12 +510,13 @@ async function validateVideoSize(videoUrl) {
     
     return { 
       valid: true, 
-      size: parseInt(contentLength),
+      size: contentLength ? parseInt(contentLength) : null,
       format: videoUrl.includes('.mkv') ? 'mkv' : 
-              videoUrl.includes('.mp4') ? 'mp4' : 'video'
+              videoUrl.includes('.mp4') ? 'mp4' : null
     };
   } catch (error) {
     console.warn('Size validation failed, proceeding anyway:', error.message);
+    // If HEAD fails, allow attempt but warn downstream
     return { valid: true, size: null, format: null };
   }
 }
@@ -514,7 +534,7 @@ async function videoCommand(sock, chatId, message) {
       text = message.message.imageMessage.caption;
     }
     
-    if (!text.startsWith('.ytmp4')) return;
+    if (!text || !text.startsWith('.ytmp4')) return;
     
     const args = text.split(' ').slice(1);
     const searchQuery = args.join(' ').trim();
@@ -599,7 +619,7 @@ async function videoCommand(sock, chatId, message) {
 
         videoUrl = mediaData.download;
         
-        console.log(`🎯 Selected ${isDramaSearch ? 'Drama' : 'Movie'}: ${videoInfo.title} (${videoInfo.format} - ${videoInfo.size})`);
+        console.log(`🎯 Selected ${isDramaSearch ? 'Drama' : 'Movie'}: ${videoInfo.title} (${videoInfo.format} - ${mediaData.size || 'unknown size'})`);
         
       } catch (searchError) {
         console.error('Media search error:', searchError);
@@ -642,7 +662,6 @@ async function videoCommand(sock, chatId, message) {
         return;
       }
     }
-
     // 📸 Send thumbnail
     if (videoInfo.thumbnail && (videoInfo.thumbnail.startsWith('https') || (isMovieSearch && videoInfo.thumbnail))) {
       try {
@@ -671,11 +690,16 @@ async function videoCommand(sock, chatId, message) {
     let videoData;
     try {
       if (isMovieSearch || isDramaSearch) {
+        // We already performed a search earlier, but call again to ensure we have a fresh download URL
         videoData = await fetchFromMovieAPIs(searchQuery, queryType.requestedFormat);
       } else {
         videoData = await fetchFromYouTubeAPIs(videoUrl);
       }
       
+      if (!videoData || !videoData.download) {
+        throw new Error('No downloadable URL returned by source API.');
+      }
+
       const sizeCheck = await validateVideoSize(videoData.download);
       if (!sizeCheck.valid) {
         await sock.sendMessage(chatId, { 
@@ -714,8 +738,9 @@ async function videoCommand(sock, chatId, message) {
 
     // 🌍 Send format guide
     setTimeout(async () => {
-      await sock.sendMessage(chatId, {
-        text: `📁 *File Format Guide* 🎬
+      try {
+        await sock.sendMessage(chatId, {
+          text: `📁 *File Format Guide* 🎬
 
 *Supported Formats:*
 • **MKV** - High quality drama/movies (100-150MB)
@@ -730,7 +755,10 @@ async function videoCommand(sock, chatId, message) {
 
 *Pro Tip:* Add "mkv" to your search for drama episodes!
 ✨ *Enjoy your entertainment!* 📺`
-      });
+        });
+      } catch (e) {
+        console.warn('Failed to send format guide:', e.message);
+      }
     }, 3000);
 
   } catch (error) {
@@ -752,18 +780,23 @@ async function videoCommand(sock, chatId, message) {
       errorMessage += '💡 Please try again in a few minutes';
     }
     
-    await sock.sendMessage(chatId, { text: errorMessage }, { quoted: message });
+    try {
+      await sock.sendMessage(chatId, { text: errorMessage }, { quoted: message });
+    } catch (sendErr) {
+      console.warn('Failed to send final error message:', sendErr.message);
+    }
   }
 }
 
-// 🚀 Multi-API Fallback for YouTube (keep existing implementation)
+// 🚀 Multi-API Fallback for YouTube (keeps existing implementation)
+// Note: ensure smartFetch calls use json responseType so mapping sees objects.
 async function fetchFromYouTubeAPIs(videoUrl) {
   const errors = [];
   
   for (const api of YT_APIS) {
     try {
       console.log(`🔄 Trying ${api.name} API...`);
-      const data = await smartFetch(api.url(videoUrl));
+      const data = await smartFetch(api.url(videoUrl), CONFIG.maxRetries, { responseType: 'json' });
       const result = api.map(data);
       
       if (result && result.download) {
@@ -781,27 +814,6 @@ async function fetchFromYouTubeAPIs(videoUrl) {
   }
   
   throw new Error('All YouTube download APIs failed.');
-}
-
-// 🔄 Smart Retry System with Jitter (keep existing implementation)
-async function smartFetch(url, retries = CONFIG.maxRetries) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      console.log(`🌐 Fetch attempt ${attempt}/${retries}`);
-      const response = await httpClient.get(url);
-      if (response.status === 200 && response.data) {
-        return response.data;
-      }
-      throw new Error(`HTTP ${response.status}`);
-    } catch (error) {
-      console.warn(`⚠️ Attempt ${attempt} failed:`, error.message);
-      if (attempt < retries) {
-        const delay = CONFIG.retryDelay * attempt + Math.random() * 500;
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
-  throw new Error(`Failed after ${retries} attempts`);
 }
 
 module.exports = videoCommand;
