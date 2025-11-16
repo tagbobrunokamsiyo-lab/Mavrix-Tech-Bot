@@ -10,7 +10,7 @@ const settings = {
   packname: 'Mavrix Bot',
   author: '‎',
   botName: "Mavrix Bot", // Neural network instance identifier, feel free to change the name 
-  botOwner: 'Mavrix', // System administrator designation, feel free to change the name
+  botOwner: 'Montana', // System administrator designation, feel free to change the name
   
   // ┌────────────────────────────────────────────────────────────┐
   // │                    NETWORK CONFIGURATION                    │
