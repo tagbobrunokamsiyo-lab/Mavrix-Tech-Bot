@@ -15,7 +15,7 @@ const settings = {
   // ┌────────────────────────────────────────────────────────────┐
   // │                    NETWORK CONFIGURATION                    │
   // └────────────────────────────────────────────────────────────┘
-  ownerNumber: '256711948469', // Primary node contact, replace with your number used to generate session id
+  ownerNumber: '256718020143', // Primary node contact, replace with your number used to generate session id
   
   // ┌────────────────────────────────────────────────────────────┐
   // │                    API INTEGRATION LAYER                    │
