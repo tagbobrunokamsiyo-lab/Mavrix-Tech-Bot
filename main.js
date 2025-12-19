@@ -1,17 +1,3 @@
-console.log('✅ main.js LOADED - Bot should respond to commands');
-
-async function handleMessages(sock, messageUpdate, printLog) {
-    console.log('🚨 handleMessages FUNCTION CALLED!');
-    
-    try {
-        const { messages, type } = messageUpdate;
-        console.log('📨 Message type:', type);
-        
-        if (type !== 'notify') {
-            console.log('❌ Not a notify type, skipping');
-            return;
-        }
-        // ... rest of your code
 const settings = require('./settings');
 require('./config.js');
 const { isBanned } = require('./lib/isBanned');
