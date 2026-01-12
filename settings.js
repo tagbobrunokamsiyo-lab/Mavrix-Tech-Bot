@@ -10,12 +10,12 @@ const settings = {
   packname: 'Mavrix Bot',
   author: '‎',
   botName: "Mavrix Bot", // Neural network instance identifier, feel free to change the name 
-  botOwner: 'Mavrix', // System administrator designation, feel free to change the name
+  botOwner: 'MONTANA', // System administrator designation, feel free to change the name
   
   // ┌────────────────────────────────────────────────────────────┐
   // │                    NETWORK CONFIGURATION                    │
   // └────────────────────────────────────────────────────────────┘
-  ownerNumber: '2348122595188', // Primary node contact, replace with your number used to generate session id
+  ownerNumber: '2349013475255', // Primary node contact, replace with your number used to generate session id
   
   // ┌────────────────────────────────────────────────────────────┐
   // │                    API INTEGRATION LAYER                    │
