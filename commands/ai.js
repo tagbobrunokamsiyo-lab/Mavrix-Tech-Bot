@@ -1,42 +1,32 @@
-// ai.js (Premium Enhanced)
+// ai.js (Clean Minimalist)
 const axios = require('axios');
 const fetch = require('node-fetch');
 
-// Premium ASCII Art
-const PREMIUM_ART = `
-╔═══════════════════════════╗
-║    🤖 PREMIUM AI SUITE    ║
-║          💎 ELITE         ║
-╚═══════════════════════════╝
-`;
+// Minimal ASCII Art
+const AI_LOGO = `╭─────────────╮
+│     AI      │
+╰─────────────╯`;
 
-const PROCESSING_ART = `
-⏳ ▰▰▰▰▰▰▰▰▰▰ 95%
-💎 PROCESSING YOUR REQUEST
-`;
+const PROCESSING = `┌─────────────┐
+│ Processing  │
+└─────────────┘`;
+
+const SUCCESS = `┌─────────────┐
+│   Response  │
+└─────────────┘`;
 
 async function aiCommand(sock, chatId, message) {
     try {
-        const text = message.message?.conversation || message.message?.extendedTextMessage?.text;
+        const text = message.message?.conversation || 
+                     message.message?.extendedTextMessage?.text;
         
         if (!text) {
             return await sock.sendMessage(chatId, { 
-                text: `💎 *PREMIUM AI ASSISTANT* 💎
-
-${PREMIUM_ART}
-📝 *Usage:* 
-┌・.gpt <your_question>
-├・.gemini <your_question>
-└・Example: .gpt write a python script
-
-✨ *Features:*
-• GPT-4 Turbo Technology 🚀
-• Gemini Pro AI Integration 
-• Ultra Fast Responses ⚡
-• Premium Quality Output 💎`
-            }, {
-                quoted: message
-            });
+                text: `${AI_LOGO}\n\n` +
+                      `*Commands:*\n` +
+                      `• .gpt <question>\n` +
+                      `• .gemini <question>`
+            }, { quoted: message });
         }
 
         const parts = text.split(' ');
@@ -45,136 +35,142 @@ ${PREMIUM_ART}
 
         if (!query) {
             return await sock.sendMessage(chatId, { 
-                text: `❌ *INVALID INPUT* ❌
-
-💡 Please provide your question after the command:
-┌・.gpt <your_question>
-└・.gemini <your_question>
-
-${PREMIUM_ART}`
-            }, {quoted:message});
+                text: `${AI_LOGO}\nPlease provide a question after the command.`
+            }, { quoted: message });
         }
 
+        // Show processing indicator
+        await sock.sendMessage(chatId, {
+            react: { text: '✨', key: message.key }
+        });
+
+        const processingMsg = await sock.sendMessage(chatId, {
+            text: `${PROCESSING}\nPlease wait...`
+        });
+
         try {
-            // Premium processing indicator
-            await sock.sendMessage(chatId, {
-                react: { text: '💎', key: message.key }
-            });
-
-            const processingMsg = await sock.sendMessage(chatId, {
-                text: `🔄 *AI IS THINKING...* 🔄
-
-${PROCESSING_ART}
-📊 Analyzing your request...
-⚡ Processing with premium AI...`
-            });
-
             if (command === '.gpt') {
-                const response = await axios.get(`https://api.dreaded.site/api/chatgpt?text=${encodeURIComponent(query)}`);
+                // Multiple GPT API endpoints for redundancy
+                const gptApis = [
+                    `https://api.dreaded.site/api/chatgpt?text=${encodeURIComponent(query)}`,
+                    `https://api.yanzbotz.my.id/api/ai/chatgpt-v4?text=${encodeURIComponent(query)}`,
+                    `https://api.ryzendesu.vip/api/ai/chatgpt?text=${encodeURIComponent(query)}`,
+                    `https://api.neoxr.my.id/api/openai?text=${encodeURIComponent(query)}`,
+                    `https://api.siputzx.my.id/api/ai/chatgpt?content=${encodeURIComponent(query)}`
+                ];
+
+                let gptResponse = null;
                 
-                if (response.data && response.data.success && response.data.result) {
-                    const answer = response.data.result.prompt;
-                    
-                    // Delete processing message
+                for (const api of gptApis) {
+                    try {
+                        console.log(`Trying GPT API: ${api}`);
+                        const response = await axios.get(api, { timeout: 10000 });
+                        
+                        if (response.data?.success && response.data?.result) {
+                            gptResponse = response.data.result.prompt || response.data.result;
+                            break;
+                        } else if (response.data?.response) {
+                            gptResponse = response.data.response;
+                            break;
+                        }
+                    } catch (e) {
+                        console.log(`GPT API failed: ${e.message}`);
+                        continue;
+                    }
+                }
+                
+                if (gptResponse) {
                     await sock.sendMessage(chatId, { 
                         delete: processingMsg.key 
                     });
 
                     await sock.sendMessage(chatId, {
-                        text: `🤖 *CHATGPT PREMIUM RESPONSE* 💎
-
-📥 *Your Query:*
-${query}
-
-💡 *AI Response:*
-${answer}
-
-${PREMIUM_ART}
-✨ *Powered by Premium AI Suite*`
-                    }, {
-                        quoted: message
-                    });
-                    
+                        text: `${SUCCESS}\n\n${gptResponse}`
+                    }, { quoted: message });
                 } else {
-                    throw new Error('Invalid response from API');
+                    throw new Error('All GPT APIs failed');
                 }
-            } else if (command === '.gemini') {
-                const apis = [
+            } 
+            else if (command === '.gemini') {
+                // Multiple Gemini API endpoints
+                const geminiApis = [
                     `https://vapis.my.id/api/gemini?q=${encodeURIComponent(query)}`,
                     `https://api.siputzx.my.id/api/ai/gemini-pro?content=${encodeURIComponent(query)}`,
                     `https://api.ryzendesu.vip/api/ai/gemini?text=${encodeURIComponent(query)}`,
                     `https://api.dreaded.site/api/gemini2?text=${encodeURIComponent(query)}`,
                     `https://api.giftedtech.my.id/api/ai/geminiai?apikey=gifted&q=${encodeURIComponent(query)}`,
-                    `https://api.giftedtech.my.id/api/ai/geminiaipro?apikey=gifted&q=${encodeURIComponent(query)}`
+                    `https://api.giftedtech.my.id/api/ai/geminiaipro?apikey=gifted&q=${encodeURIComponent(query)}`,
+                    `https://api.yanzbotz.my.id/api/ai/gemini?text=${encodeURIComponent(query)}`,
+                    `https://api.neoxr.my.id/api/gemini?text=${encodeURIComponent(query)}`,
+                    `https://api.lolhuman.xyz/api/gemini?apikey=dannlaina&text=${encodeURIComponent(query)}`,
+                    `https://api.caliph.my.id/api/gemini?text=${encodeURIComponent(query)}`,
+                    `https://api.azz.biz.id/api/gemini?q=${encodeURIComponent(query)}`
                 ];
 
-                for (const api of apis) {
+                let geminiResponse = null;
+                
+                for (const api of geminiApis) {
                     try {
-                        const response = await fetch(api);
+                        console.log(`Trying Gemini API: ${api}`);
+                        const response = await fetch(api, { timeout: 10000 });
+                        
+                        if (!response.ok) continue;
+                        
                         const data = await response.json();
-
-                        if (data.message || data.data || data.answer || data.result) {
-                            const answer = data.message || data.data || data.answer || data.result;
-                            
-                            // Delete processing message
-                            await sock.sendMessage(chatId, { 
-                                delete: processingMsg.key 
-                            });
-
-                            await sock.sendMessage(chatId, {
-                                text: `🔮 *GEMINI PRO RESPONSE* 💎
-
-📥 *Your Query:*
-${query}
-
-💡 *AI Response:*
-${answer}
-
-${PREMIUM_ART}
-🚀 *Enhanced by Gemini Pro Technology*`
-                            }, {
-                                quoted: message
-                            });
-                            
-                            return;
+                        
+                        // Parse various response formats
+                        if (data.message) {
+                            geminiResponse = data.message;
+                            break;
+                        } else if (data.data) {
+                            geminiResponse = data.data;
+                            break;
+                        } else if (data.answer) {
+                            geminiResponse = data.answer;
+                            break;
+                        } else if (data.result) {
+                            geminiResponse = data.result;
+                            break;
+                        } else if (data.response) {
+                            geminiResponse = data.response;
+                            break;
+                        } else if (data.text) {
+                            geminiResponse = data.text;
+                            break;
                         }
                     } catch (e) {
+                        console.log(`Gemini API failed: ${e.message}`);
                         continue;
                     }
                 }
-                throw new Error('All Gemini APIs failed');
+                
+                if (geminiResponse) {
+                    await sock.sendMessage(chatId, { 
+                        delete: processingMsg.key 
+                    });
+
+                    await sock.sendMessage(chatId, {
+                        text: `${SUCCESS}\n\n${geminiResponse}`
+                    }, { quoted: message });
+                } else {
+                    throw new Error('All Gemini APIs failed');
+                }
             }
         } catch (error) {
             console.error('API Error:', error);
-            await sock.sendMessage(chatId, {
-                text: `❌ *PREMIUM SERVICE ERROR* ❌
-
-😔 Sorry, our premium AI service is temporarily unavailable.
-
-🔧 *Troubleshooting:*
-• Check your internet connection 📶
-• Try again in a few moments ⏳
-• Contact support if issue persists 🛠️
-
-${PREMIUM_ART}
-💎 We're working to restore service immediately.`
-            }, {
-                quoted: message
+            await sock.sendMessage(chatId, { 
+                delete: processingMsg.key 
             });
+            
+            await sock.sendMessage(chatId, {
+                text: `${AI_LOGO}\n\nService error. Please try again later.`
+            }, { quoted: message });
         }
     } catch (error) {
         console.error('AI Command Error:', error);
         await sock.sendMessage(chatId, {
-            text: `💥 *SYSTEM ERROR* 💥
-
-🚨 An unexpected error occurred in our premium AI system.
-
-${PREMIUM_ART}
-🔧 Our technical team has been notified.
-📞 Please try again shortly.`
-        }, {
-            quoted: message
-        });
+            text: `${AI_LOGO}\n\nSystem error. Please try again.`
+        }, { quoted: message });
     }
 }
 
